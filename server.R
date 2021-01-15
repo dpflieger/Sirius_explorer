@@ -1,11 +1,3 @@
-library(shiny)
-library(shinyFiles)
-library(shinythemes)
-library(jsonlite)
-library(DT)
-library(data.table)
-library(stringr)
-
 shinyServer(function(input, output, session) {
     
     shinyDirChoose(input, 'dir_select_input', roots=c(home = "~"), session = session, defaultRoot = "home")

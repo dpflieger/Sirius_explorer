@@ -1,0 +1,7 @@
+library(shiny)
+library(shinyFiles)
+library(shinythemes)
+library(jsonlite)
+library(DT)
+library(data.table)
+library(stringr)
