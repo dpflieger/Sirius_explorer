@@ -1,5 +1,7 @@
 library(shiny)
 library(shinyFiles)
+library(shinyWidgets)
+library(shinydashboard)
 library(shinythemes)
 library(jsonlite)
 library(DT)

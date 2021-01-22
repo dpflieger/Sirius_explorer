@@ -1,8 +1,16 @@
 shinyServer(function(input, output, session) {
     
+    notifications_list <- reactiveValues()
+    output$notifications <- renderMenu({
+        dropdownMenu(type = "tasks", 
+                     badgeStatus = 'info',
+                     .list = reactiveValuesToList(notifications_list)
+        )
+    })
+    
     shinyDirChoose(input, 'dir_select_input', roots=c(home = "~"), session = session, defaultRoot = "home")
     #dirname(file.choose())
-    
+
     sirius_dir <- reactive({
         return(parseDirPath(c(home = "~"), input$dir_select_input))
     })
@@ -14,7 +22,7 @@ shinyServer(function(input, output, session) {
     
     #dir = "/home/dpflieger/4_Tissue+Exudates-sirius301120_38"
     #sirius_dir = "/home/dpflieger/sirius"
-    # 
+    
     formula.dt <- reactive({
         req(sirius_dir())
         dt <- try(fread(file.path(sirius_dir(), "formula_identifications.tsv")))
@@ -40,7 +48,6 @@ shinyServer(function(input, output, session) {
             #message("Found fragments.rds: ", fragments.rds())
             rds_objects$fragments.dt <- readRDS(fragments.rds)
         }
-        
         
         if( !isTRUE(file.exists(losses.rds)) || !isTRUE(file.exists(fragments.rds)) ) {
             #message("Loading data...")
@@ -71,8 +78,8 @@ shinyServer(function(input, output, session) {
             
             saveRDS(object = rds_objects$losses.dt, file = losses.rds)
             saveRDS(object = rds_objects$fragments.dt, file = fragments.rds)
-            
         }
+        notifications_list$infile <- notificationItem(text = paste("Loaded", sirius_dir()), icon("check"), status = "success")
     })
  
     # print(fragments.dt)
@@ -100,7 +107,13 @@ shinyServer(function(input, output, session) {
     output$fragments.dt.display <- renderDT({
         req(rds_objects$fragments.dt)
         message("Rendering fragments...")
-        datatable(rds_objects$fragments.dt, 
+        
+        dt <- rds_objects$fragments.dt
+        
+        if(!is.na(input$mz))
+            dt <- dt[mz <= input$mz + input$mz_approximation & mz >= input$mz - input$mz_approximation]
+        
+        datatable(dt, 
                   rownames = FALSE,
                   # colnames= c("Rank" = "rank", 
                   #             "molecularFormula" = "molecularFormula",
