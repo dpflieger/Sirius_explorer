@@ -1,11 +1,12 @@
 dashboardPage(
     title = "Sirius JSON explorer",
+
     dashboardHeader(title = "Sirius JSON explorer",
-                    dropdownMenuOutput("notifications")
+                    tags$li(class = "dropdown", tags$a((htmlOutput("view_sirius_dir"))))
                     ), # dashboardHeader
     dashboardSidebar(
         sidebarMenu(
-            shinyDirButton(id = "dir_select_input", label = "Select a sirius folder", title = "Select your sirius folder !"),
+            shinyDirButton(id = "dir_select", label = "Select a sirius folder", title = "Select your sirius folder !"),
             menuItem("Search", tabName = "search"),
             numericInput(inputId = "mz", "mz (a numeric)", value = NULL, step = 0.001),
             numericInput(inputId = "mz_approximation", "+/- mz approximation", value = 0.003, step = 0.001)
