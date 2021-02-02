@@ -1,29 +1,38 @@
 shinyServer(function(input, output, session) {
     
+    # Get all hardrives names (Windows/linux/MacOS friendly)
+    volumes <- getVolumes()() # yeah weird design
+    
+    # Select a directory (via the ShinyFiles package)
+    shinyDirChoose(input, 'dir_select', roots = volumes, session = session)
+
 # Check directory ---------------------------------------------------------
-      if(isTRUE(file.exists("latest_dir.rds"))) {
+    
+    # Reload last session directory
+    if(isTRUE(file.exists("latest_dir.rds"))) {
         print("Loading the latest directory")
-        sirius_dir <- reactive({ readRDS("latest_dir.rds") })
+        tmp <- readRDS("latest_dir.rds")
+        if(dir.exists(tmp)) sirius_dir <- reactive({ tmp })
         
     } else {
+        # Change input$dir from vector to character
         sirius_dir <- reactive({
-            dir <- parseDirPath(c(home = "~"), input$dir_select)
-            saveRDS(object = dir, file = "latest_dir.rds")
-            return(dir)
+            parseDirPath(volumes, input$dir_select)
         })
+        
     }
     
-    shinyDirChoose(input, 'dir_select', roots=c(home = "~"), session = session, defaultRoot = "home")
+    observeEvent(sirius_dir(), {
+        saveRDS(sirius_dir(), "latest_dir.rds")
+    })
     
+    
+    # Render selected directory
     output$view_sirius_dir <- renderUI({
         req(sirius_dir())
         HTML(sirius_dir())
     })
     
-    #dir = "/home/dpflieger/4_Tissue+Exudates-sirius301120_38"
-    #sirius_dir = "/home/dpflieger/sirius"
-    
-
 # Load formula_identifications file ---------------------------------------
     formula.dt <- reactive({
         req(sirius_dir())
@@ -58,10 +67,9 @@ shinyServer(function(input, output, session) {
         if( !isTRUE(file.exists(losses.rds)) || !isTRUE(file.exists(fragments.rds)) ) {
             #message("Loading data...")
             x <- setNames(formula.dt()$json_path, formula.dt()$json_path)
+            # Setup a progress to see the loading state of the JSON files
             withProgress(message = 'Loading ', value = 0, {
                 json_data <- lapply(x, function(json_path) {
-                    #Sys.sleep(0.05)
-                    #message("Reading ", json_path)
                     incProgress(1/length(x), message = paste0("Loading JSON: ", which(x == json_path), "/", length(x)))
                     if(file.exists(json_path)) {
                         res <- jsonlite::fromJSON(json_path, flatten = TRUE)
@@ -89,7 +97,8 @@ shinyServer(function(input, output, session) {
             # Select wanted columns
             fragments.dt <- fragments.dt[, c("JSON", "id", "molecularFormula", "massDeviation", "score", "mz"), drop = FALSE]
             # Using MathJax we can display correctly molecular formula
-            fragments.dt[, molecularFormula := paste0("$$\\ce{", molecularFormula, " }$$")]
+            #fragments.dt[, molecularFormula := paste0("$$\\ce{", molecularFormula, " }$$")]
+            
             fragments.dt[, score := signif(score, 6)]
             fragments.dt[, massDeviation := signif(as.numeric(stringr::str_extract(massDeviation, '\\d.\\d+')), 6)]
             fragments.dt[, c("info", "useless", "FBMM_id") := tstrsplit(basename(dirname(dirname(JSON))), "_", fixed=TRUE)]
@@ -102,6 +111,15 @@ shinyServer(function(input, output, session) {
         }
     })
  
+    # Reactive fragments table
+    fragments.dt <- reactive({
+        dt <- rds_objects$fragments.dt
+        # if user uses filter
+        if(!is.na(input$mz))
+            dt <- dt[mz <= input$mz + input$mz_approximation & mz >= input$mz - input$mz_approximation]
+        return(dt)
+    }) 
+    
 
 # Render formula  ---------------------------------------------------------
     output$precursor.dt.display <- renderDT({
@@ -112,12 +130,14 @@ shinyServer(function(input, output, session) {
         
         s <- input$fragments.dt.display_rows_selected
         if (length(s)) {
-          selected_row <- rds_objects$fragments.dt[s, , drop = FALSE]
+          selected_row <- fragments.dt()[s, , drop = FALSE]
           dt <- dt[FBMM_id %in% selected_row$FBMM_id, ]
-          print(dt)
         }
 
-        datatable(dt[, c("rank", "molecularFormula", "precursorFormula", "IsotopeScore", "ionMass", "id"), with = FALSE],
+        dt_f <- dt[, c("rank", "molecularFormula", "IsotopeScore", "ionMass", "id"), with = FALSE]
+        setcolorder(dt_f, c("id", "rank"))
+        
+        datatable(dt_f,
                   rownames = FALSE,
                   filter = list(position = 'top', clear = TRUE),
                   selection = 'single',
@@ -125,7 +145,9 @@ shinyServer(function(input, output, session) {
                       dom = "Qrtip",
                       search = list(regex = TRUE, caseInsensitive = FALSE),
                       columnDefs = list(list(className = 'dt-center', targets = c(1))),
-                      pageLength = 6, rowCallback=JS("function( settings ) { MathJax.Hub.Queue(['Typeset',MathJax.Hub]);}"))
+                      pageLength = 6
+                      #rowCallback=JS("function( settings ) { MathJax.Hub.Queue(['Typeset',MathJax.Hub]);}")
+                      )
         )
     })
 
@@ -135,14 +157,11 @@ shinyServer(function(input, output, session) {
     # so atm we need a callback to the lib everytime it refreshes.
     # Ugly but works tho ¯\_(ツ)_/¯
     output$fragments.dt.display <- renderDT({
-        req(rds_objects$fragments.dt)
+        req(fragments.dt())
         message("Rendering fragments...")
         
-        dt <- rds_objects$fragments.dt
-        
-        if(!is.na(input$mz))
-            dt <- dt[mz <= input$mz + input$mz_approximation & mz >= input$mz - input$mz_approximation]
-        
+        dt <- fragments.dt()
+
         datatable(dt[, c("JSON", "id", "molecularFormula", "massDeviation", "mz", "FBMM_id"), with = FALSE], 
                   rownames = FALSE,
                   # colnames= c("Rank" = "rank", 
@@ -154,7 +173,9 @@ shinyServer(function(input, output, session) {
                       dom = "Qrtip",
                       search = list(regex = TRUE, caseInsensitive = FALSE),
                       columnDefs = list(list(className = 'dt-center', targets = c(1))),
-                      pageLength = 6, rowCallback=JS("function( settings ) { MathJax.Hub.Queue(['Typeset',MathJax.Hub]);}"))
+                      pageLength = 6
+                      #rowCallback=JS("function( settings ) { MathJax.Hub.Queue(['Typeset',MathJax.Hub]);}")
+                      )
         )
     })
 
@@ -162,10 +183,15 @@ shinyServer(function(input, output, session) {
     output$losses.dt.display <- renderDT({
         req(rds_objects$losses.dt)
         message("Rendering losses...")
+        # Extract the selected row (number) in the fragments.dt
         s = input$fragments.dt.display_rows_selected
+        #print(paste("Selected row:", s))
         if (length(s)) {
-            selected_row = rds_objects$fragments.dt[s, , drop = FALSE]
-            datatable(rds_objects$losses.dt[source %in% selected_row$id & JSON %in% selected_row$JSON, c("JSON", "source", "target", "molecularFormula", "score", "delta_mz", "source_mz", "target"), with=FALSE],
+            # Get the complete row from the table
+            selected_row = fragments.dt()[s, , drop = FALSE]
+            
+            # Match elements with the other table
+            datatable(rds_objects$losses.dt[JSON %in% selected_row$JSON & source %in% selected_row$id , c("JSON", "source", "target", "molecularFormula", "score", "delta_mz", "source_mz", "target_mz"), with=FALSE],
                       rownames = FALSE,
                       options = list(
                           dom = "rti"

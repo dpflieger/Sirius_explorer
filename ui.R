@@ -6,7 +6,7 @@ dashboardPage(
                     ), # dashboardHeader
     dashboardSidebar(
         sidebarMenu(
-            shinyDirButton(id = "dir_select", label = "Select a sirius folder", title = "Select your sirius folder !"),
+            shinyDirButton(id = "dir_select", label = "Select a sirius folder", title = "Select your sirius folder !", ),
             menuItem("Search", tabName = "search"),
             numericInput(inputId = "mz", "mz (a numeric)", value = NULL, step = 0.001),
             numericInput(inputId = "mz_approximation", "+/- mz approximation", value = 0.003, step = 0.001)
@@ -15,22 +15,22 @@ dashboardPage(
     
     # Application title
     dashboardBody(
-        tags$style("html, body {overflow: visible !important;"),
-        withMathJax("$$\\require{mhchem}$$"),
+        #tags$style("html, body {overflow: visible !important;"),
         tabItems(
             tabItem(tabName = "search", 
                     fluidPage(
                         fluidRow(
-                            box(DT::dataTableOutput("precursor.dt.display"), title = "Formula identification", collapsible = TRUE, width = 12, status = "primary")
+                            box(DT::dataTableOutput("precursor.dt.display"), title = "Formula identification", collapsible = TRUE, width = 12, status = "warning")
                             ), # fluidRow
                         fluidRow(
                             box(DT::dataTableOutput("fragments.dt.display"), title = "Fragments", collapsible = TRUE, width = 12, status = "primary")
                             ), # fluidRow
                         fluidRow(
-                            box(DT::dataTableOutput("losses.dt.display"), title = "Losses", collapsible = TRUE, width = 12, status = "primary")
+                            box(DT::dataTableOutput("losses.dt.display"), title = "Losses", collapsible = TRUE, width = 12, status = "info")
                         ) # fluidRow
                     ) # fluidPage
             ) # tabItem
-        ) # tabItems
+        ), # tabItems
+        withMathJax("$$\\require{mhchem}$$"),
     ) # dashboardBody
 ) # dashboardPage
