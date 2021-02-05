@@ -116,10 +116,9 @@ shinyServer(function(input, output, session) {
         dt <- rds_objects$fragments.dt
         # if user uses filter
         if(!is.na(input$mz))
-            dt <- dt[mz <= input$mz + input$mz_approximation & mz >= input$mz - input$mz_approximation]
+            dt <- dt[mz <= input$mz + (input$mz * input$ppm_approximation * 1e-06) & mz >= input$mz - (input$mz * input$ppm_approximation * 1e-06)]
         return(dt)
     }) 
-    
 
 # Render formula  ---------------------------------------------------------
     output$precursor.dt.display <- renderDT({
@@ -185,17 +184,47 @@ shinyServer(function(input, output, session) {
         message("Rendering losses...")
         # Extract the selected row (number) in the fragments.dt
         s = input$fragments.dt.display_rows_selected
-        #print(paste("Selected row:", s))
-        if (length(s)) {
+        if (length(s) != 0) {
             # Get the complete row from the table
             selected_row = fragments.dt()[s, , drop = FALSE]
             
+            # # Match elements with the other table
+            # datatable(rds_objects$losses.dt[JSON %in% selected_row$JSON & source %in% selected_row$id , c("JSON", "source", "target", "molecularFormula", "score", "delta_mz", "source_mz", "target_mz"), with=FALSE],
+            #           rownames = FALSE,
+            #           options = list(
+            #               dom = "rti"
+            #           ))            
             # Match elements with the other table
-            datatable(rds_objects$losses.dt[JSON %in% selected_row$JSON & source %in% selected_row$id , c("JSON", "source", "target", "molecularFormula", "score", "delta_mz", "source_mz", "target_mz"), with=FALSE],
+            datatable(rds_objects$losses.dt[JSON %in% selected_row$JSON, c("JSON", "source", "target", "molecularFormula", "score", "delta_mz", "source_mz", "target_mz"), with=FALSE],
                       rownames = FALSE,
                       options = list(
                           dom = "rti"
                       ))
         }
     })
+    
+
+# visNetwork --------------------------------------------------------------
+# https://datastorm-open.github.io/visNetwork/shiny.html
+
+    output$network <- renderVisNetwork({
+      req(rds_objects$losses.dt, input$fragments.dt.display_rows_selected)
+      s = input$fragments.dt.display_rows_selected
+      # Get the complete row from the table
+      selected_row = fragments.dt()[s, , drop = FALSE]
+
+      nodes <- rds_objects$fragments.dt[JSON %in% selected_row$JSON, c("JSON", "id", "molecularFormula")]
+      setnames(nodes, c("molecularFormula"), c("label"))
+      edges <- rds_objects$losses.dt[JSON %in% selected_row$JSON, c("JSON", "source", "target", "molecularFormula")]
+      setnames(edges, c("source", "target", "molecularFormula"), c("from", "to", "label"))
+      
+      t <- visNetwork(nodes, edges, width = "120") %>% 
+        visIgraphLayout(layout = "layout_as_tree", randomSeed = 1337)
+      print("Making tree")
+      t$x$nodes$y <- -t$x$nodes$y # reverse the tree, makes it TOPDOWN
+      t$x$nodes$shape <- "box" # shape to box
+      
+      return(t)
+    })
+    
 })

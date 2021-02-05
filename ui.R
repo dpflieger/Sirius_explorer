@@ -8,8 +8,8 @@ dashboardPage(
         sidebarMenu(
             shinyDirButton(id = "dir_select", label = "Select a sirius folder", title = "Select your sirius folder !", ),
             menuItem("Search", tabName = "search"),
-            numericInput(inputId = "mz", "mz (a numeric)", value = NULL, step = 0.001),
-            numericInput(inputId = "mz_approximation", "+/- mz approximation", value = 0.003, step = 0.001)
+            numericInput(inputId = "mz", "Mass-to-charge ratio (m/z)", value = NULL, step = 0.001),
+            numericInput(inputId = "ppm_approximation", "Mass accuracy (ppm)", value = 3, step = 1)
         ) # sideBarMenu
     ), # dashboardSidebar
     
@@ -27,7 +27,10 @@ dashboardPage(
                             ), # fluidRow
                         fluidRow(
                             box(DT::dataTableOutput("losses.dt.display"), title = "Losses", collapsible = TRUE, width = 12, status = "info")
-                        ) # fluidRow
+                        ), # fluidRow
+                        fluidRow(
+                            box(visNetworkOutput("network"),  title = "Trees", collapsible = TRUE, width = 12)
+                            )
                     ) # fluidPage
             ) # tabItem
         ), # tabItems
